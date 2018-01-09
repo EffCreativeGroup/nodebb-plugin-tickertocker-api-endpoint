@@ -1,0 +1,27 @@
+{
+  "name": "nodebb-plugin-tickertocker-api-endpoint",
+  "version": "1.0.0",
+  "description": "TT API for NodeBB",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "nodebb",
+    "plugin",
+    "API",
+    "REST",
+    "JSON"
+  ],
+  "dependencies": {
+    "express": "^4.12.0",
+    "passport-http-bearer": "^1.0.1",
+    "nconf": "^0.8.5",
+    "nodebb-plugin-session-sharing": "git+https://github.com/EffCreativeGroup/nodebb-plugin-session-sharing.git"
+  },
+  "license": "MIT",
+  "readmeFilename": "README.md",
+  "nbbpm": {
+    "compatibility": "^1.4.5"
+  }
+}
