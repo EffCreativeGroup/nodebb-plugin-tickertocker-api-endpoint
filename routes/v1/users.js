@@ -219,7 +219,7 @@ module.exports = function () {
           winston.info('[tt-api-endpoint][get user from tt]: ', { response });
 
           var userId = 0;
-          if (typeof(response) !== 'undefined') {
+          if (typeof (response) !== 'undefined') {
             userId = parseInt(response.uid, 10);
           }
 
@@ -250,7 +250,13 @@ module.exports = function () {
             }
 
             if (req.body.externalUserRole) {
-              Object.values(nodebbGroups).forEach(role => groups.leave(role, uid));
+              (function () {
+                for (var role in nodebbGroups) {
+                  if (nodebbGroups.hasOwnProperty(role)) {
+                    groups.leave(nodebbGroups[role], uid);
+                  }
+                }
+              }());
 
               var role = rolesMap[parseInt(req.body.externalUserRole, 10)];
               if (!role) {
