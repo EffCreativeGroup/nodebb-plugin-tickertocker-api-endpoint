@@ -24,10 +24,12 @@ const db = require.main.require('./src/database');
 const winston = module.parent.require('winston');
 
 module.getSessionSharingPropertyKey = function (prop) {
-  var name = plugin.settings.sessionSharingSettings.name;
-
-  if (typeof (name) !== 'string' || name.length === 0) {
-    name = 'appId';
+  var name = 'appId';
+  var isAttrInSettings = typeof plugin.settings.sessionSharingSettings !== 'undefined'
+    && typeof plugin.settings.sessionSharingSettings.name !== 'undefined'
+    && plugin.settings.sessionSharingSettings.name.length > 0;
+  if (isAttrInSettings) {
+    name = plugin.settings.sessionSharingSettings.name;
   }
 
   winston.info('[tt-api-endpoint] param to connect user from session-sharring:', name);
