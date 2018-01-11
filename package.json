@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-tickertocker-api-endpoint",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "TT API for NodeBB",
   "main": "index.js",
   "scripts": {

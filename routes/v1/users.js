@@ -266,6 +266,11 @@ module.exports = function () {
               groups.join(role, uid);
             }
 
+            // Update avatar
+            if (typeof data.picture === 'string') {
+              db.setObjectField(`user:${uid}`, 'picture', data.picture);
+            }
+
             return next(null, res, user.uid);
           });
         } else {
