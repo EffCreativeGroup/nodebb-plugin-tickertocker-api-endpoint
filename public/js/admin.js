@@ -2,7 +2,7 @@
 
 /* globals define, $, socket, ajaxify, app */
 
-define('admin/plugins/nodebb-plugin-tickertocker-api-endpoint', ['settings'], function (Settings) {
+define('admin/plugins/tickertocker-api-endpoint', ['settings'], function (Settings) {
   var Admin = {};
 
   Admin.init = function () {

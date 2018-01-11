@@ -2,14 +2,14 @@
 
 /* globals module, require */
 
-var async = require.main.require('async'),
-  errorHandler = require('../../lib/errorHandler'),
+var async = require('async');
+var errorHandler = require('../../lib/errorHandler');
+var winston = require('winston');
+var { TOKEN_INVALID } = require('../../constants/response-codes');
+var { ROLE_ADMIN } = require('../../constants/user-roles');
 
-  Middleware = {};
-
-const winston = module.parent.require('winston');
-
-Middleware.requireUser = function (req, res, next) {
+var middlewares = {};
+middlewares.requireUser = function (req, res, next) {
   var restApiClientFactory = require('../../rest-api-client');
   var restApi = restApiClientFactory();
   if (req.headers.hasOwnProperty('authorization')) {
@@ -21,13 +21,13 @@ Middleware.requireUser = function (req, res, next) {
     var callback = function (err, uid, role) {
       if (err) {
         switch (err.message) {
-        case 'token-invalid':
-          winston.error('[tt-api-endpoint] The passed-in token was invalid and could not be processed');
-          return errorHandler.respond(401, res);
+          case TOKEN_INVALID:
+            winston.error('[tt-api-endpoint] The passed-in token was invalid and could not be processed');
+            return errorHandler.respond(401, res);
 
-        default:
-          winston.error('[tt-api-endpoint] Error encountered while parsing token: ' + err.message);
-          return errorHandler.respond(401, res);
+          default:
+            winston.error('[tt-api-endpoint] Error encountered while parsing token: ' + err.message);
+            return errorHandler.respond(401, res);
         }
       }
 
@@ -48,7 +48,7 @@ Middleware.requireUser = function (req, res, next) {
       .then(function (res) {
         winston.info('[tt-api-endpoint][A] get current user success');
         // only admin is allowed
-        if (parseInt(res.data.result.role) === parseInt(module.parent.parent.parent.exports.tickertockerAdminRole)) {
+        if (parseInt(res.data.result.role) === ROLE_ADMIN) {
           callback(null, res.data.result, res.data.result.role);
         } else {
           callback(new Error('token-invalid'));
@@ -61,4 +61,4 @@ Middleware.requireUser = function (req, res, next) {
   }
 };
 
-module.exports = Middleware;
+module.exports = middlewares;

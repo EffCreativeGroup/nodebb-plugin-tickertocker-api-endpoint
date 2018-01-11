@@ -7,8 +7,8 @@
         * `POST /`
             * Creates a new user
             * **Requires**: 
-                * `TTUserId` - tickertocker ID, 
-                * `TTRole` - tickertocker ROLE_ID, 
+                * `externalUserId` - tickertocker ID, 
+                * `externalUserRole` - tickertocker ROLE_ID, 
                 * `username`, 
                 * `email` 
             * **Accepts**: `fullname`, `website`, `password`
@@ -16,22 +16,22 @@
         * `PUT /`
             * Update data of user
             * **Requires**: 
-                * `TTUserId` - tickertocker ID
-            * **Accepts**: `username`, `email`, `TTRole`, `fullname`, `website`
+                * `externalUserId` - tickertocker ID
+            * **Accepts**: `username`, `email`, `externalUserRole`, `fullname`, `website`
             * _(Bearer authorization token is required)_
         * `DELETE /`
             * Delete user
             * **Requires**: 
-                * `TTUserId` - tickertocker ID
+                * `externalUserId` - tickertocker ID
             * _(Bearer authorization token is required)_
         * `/ban`
             * `POST /`
                 * ban user
                 * **Requires**: 
-                    * `TTUserId` - tickertocker ID
+                    * `externalUserId` - tickertocker ID
                 * _(Bearer authorization token is required)_
             * `DELETE /`
                 * unban user
                 * **Requires**: 
-                    * `TTUserId` - tickertocker ID
+                    * `externalUserId` - tickertocker ID
                 * _(Bearer authorization token is required)_

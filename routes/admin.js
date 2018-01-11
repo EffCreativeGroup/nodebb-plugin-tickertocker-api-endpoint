@@ -21,12 +21,12 @@
           });
         }
       }, function (err, data) {
-        res.render('admin/plugins/nodebb-plugin-tickertocker-api-endpoint', data);
+        res.render('admin/plugins/tickertocker-api-endpoint', data);
       });
     };
 
   module.exports = function (app, middleware) {
-    app.get('/admin/plugins/nodebb-plugin-tickertocker-api-endpoint', middleware.admin.buildHeader, buildAdminPage);
-    app.get('/api/admin/plugins/nodebb-plugin-tickertocker-api-endpoint', buildAdminPage);
+    app.get('/admin/plugins/tickertocker-api-endpoint', middleware.admin.buildHeader, buildAdminPage);
+    app.get('/api/admin/plugins/tickertocker-api-endpoint', buildAdminPage);
   };
 }());

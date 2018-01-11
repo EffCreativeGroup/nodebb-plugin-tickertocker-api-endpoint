@@ -2,29 +2,36 @@
 
 /* globals module, require */
 
-var errorHandler = require('../../lib/errorHandler.js'),
+var errorHandler = require('../../lib/errorHandler.js');
+var utils = {};
 
-  Utils = {};
+utils.checkRequired = function (required, req, res) {
+  if (!Array.isArray(required)) {
+    required = [required];
+  }
 
-Utils.checkRequired = function (required, req, res) {
   var missing = [];
-  for (var x = 0, numRequired = required.length; x < numRequired; x++) {
-    if (!req.body.hasOwnProperty(required[x])) {
-      missing.push(required[x]);
+  for (var i = 0, numRequired = required.length; i < numRequired; i++) {
+    if (!req.body.hasOwnProperty(required[i])) {
+      missing.push(required[i]);
     }
   }
 
   if (!missing.length) {
     return true;
-  } else if (res) {
+  }
+
+  if (res) {
     res.status(400).json(errorHandler.generate(
-      400, 'params-missing',
+      400,
+      'params-missing',
       'Required parameters were missing from this API call, please see the "params" property',
       missing
     ));
     return false;
   }
+
   return false;
 };
 
-module.exports = Utils;
+module.exports = utils;

@@ -28,8 +28,8 @@ Authentication is handled via HTTP Bearer Token, as generated/specified in the T
 When the API encounters an error, it will do it's best to report what went wrong. Errors will follow the format specified in this example:
 
     {
-        "code": "not-authorised",
-        "message": "You are not authorised to make this call",
+        "code": "not-authorized",
+        "message": "You are not authorized to make this call",
         "params": {}
     }
     

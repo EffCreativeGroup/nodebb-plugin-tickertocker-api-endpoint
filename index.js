@@ -4,46 +4,59 @@
 
 const meta = module.parent.require('./meta');
 const sockets = require('./lib/sockets');
-const async = require.main.require('async');
-const API = {
+const async = require('async');
+const winston = module.parent.require('winston');
+const plugin = {
+  settingsKey: 'ttapi',
+  baseUrl: '/tt-api/v1/',
   settings: {},
   tickertockerAdminRole: 20
 };
 
-API.init = function (data, callback) {
+plugin.init = function (data, callback) {
   // API Versions
   var routes = require('./routes')(data.middleware);
-  data.router.use('/tt-api/v1', routes.v1);
+  data.router.use(plugin.baseUrl, routes.v1);
 
   require('./routes/admin')(data.router, data.middleware);	// ACP
-  sockets.init();	// WebSocket listeners
+  sockets.init(); // WebSocket listeners
 
-  API.reloadSettings(callback);
+  plugin.initialSettings(callback);
 };
 
-API.addMenuItem = function (custom_header, callback) {
+plugin.addMenuItem = function (custom_header, callback) {
   custom_header.plugins.push({
-    route: '/plugins/nodebb-plugin-tickertocker-api-endpoint',
+    route: '/plugins/tickertocker-api-endpoint',
     icon: 'fa-cogs',
-    name: 'TT API'
+    name: 'TickerTocker API'
   });
 
   callback(null, custom_header);
 };
 
-API.authenticate = function (data) {
+plugin.authenticate = function (data) {
   require('./routes/v1/middleware').requireUser(data.req, data.res, data.next);
 };
 
-API.reloadSettings = function (callback) {
+plugin.reloadSettings = function (event) {
+  meta.settings.get(plugin.settingsKey, function (err, settings) {
+    if (err) {
+      return err;
+    }
+
+    plugin.settings = settings;
+  });
+};
+
+plugin.initialSettings = function (callback) {
   async.waterfall([
     function (next) {
-      meta.settings.get('ttapi', function (err, settings) {
+      meta.settings.get(plugin.settingsKey, function (err, settings) {
         if (err) {
           return next(err);
         }
 
-        API.settings = settings;
+        plugin.settings = settings;
 
         next();
       });
@@ -54,9 +67,7 @@ API.reloadSettings = function (callback) {
           return next(err);
         }
 
-        API.settings.sessionSharringSettings = settings;
-
-        // winston.info('[API Settings]', API.settings);
+        plugin.settings.sessionSharingSettings = settings;
 
         next();
       });
@@ -64,5 +75,5 @@ API.reloadSettings = function (callback) {
   ], callback);
 };
 
-module.exports = API;
+module.exports = plugin;
 

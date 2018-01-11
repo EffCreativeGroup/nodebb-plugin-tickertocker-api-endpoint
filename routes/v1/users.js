@@ -2,31 +2,45 @@
 
 /* globals module, require */
 
-var user = require.main.require('./src/user'),
-  groups = require.main.require('./src/groups'),
-  apiMiddleware = require('./middleware'),
-  errorHandler = require('../../lib/errorHandler'),
-  utils = require('./utils'),
-  async = require.main.require('async');
-
+var user = require.main.require('./src/user');
+var groups = require.main.require('./src/groups');
+var apiMiddleware = require('./middleware');
+var errorHandler = require('../../lib/errorHandler');
+var utils = require('./utils');
+var async = require.main.require('async');
+var plugin = require('../../index');
+var { ROLE_ADMIN, ROLE_INVESTOR, ROLE_PRO } = require('../../constants/user-roles');
+var nodebbGroups = {
+  administrators: 'administrators',
+  investors: 'Investors',
+  pros: 'Pros'
+};
+var rolesMap = {
+  [ROLE_ADMIN]: nodebbGroups.administrators,
+  [ROLE_PRO]: nodebbGroups.pros,
+  [ROLE_INVESTOR]: nodebbGroups.investors
+};
 const db = require.main.require('./src/database');
 const winston = module.parent.require('winston');
 
-module.getSessionSharingName = function () {
-  var name = module.parent.parent.parent.exports.settings.sessionSharringSettings.name;
+module.getSessionSharingPropertyKey = function (prop) {
+  var name = plugin.settings.sessionSharingSettings.name;
+
   if (typeof (name) !== 'string' || name.length === 0) {
     name = 'appId';
   }
 
-  return name;
+  winston.info('[tt-api-endpoint] param to connect user from session-sharring:', name);
+
+  return prop ? `${name}:${prop}` : name;
 };
 
-/*
- *	Given a remoteId, show user data
+/**
+ * Given a remoteId, show user data
  */
 module.getUser = function (remoteId, callback) {
   async.waterfall([
-    async.apply(db.sortedSetScore, module.getSessionSharingName() + ':uid', remoteId),
+    async.apply(db.sortedSetScore, module.getSessionSharingPropertyKey('uid'), remoteId),
     function (uid, next) {
       if (uid) {
         user.getUserFields(uid, ['uid', 'email', 'username'], next);
@@ -41,20 +55,16 @@ module.exports = function () {
   var app = require('express').Router();
 
   app.post('/', apiMiddleware.requireUser, function (req, res) {
+    var requiredFields = [
+      'externalUserId',
+      'externalUserRole',
+      'username',
+      'email'
+    ];
+
     winston.info('[tt-api-endpoint][create user] start:');
-    if (!utils.checkRequired(['TTUserId'], req, res)) {
-      return false;
-    }
 
-    if (!utils.checkRequired(['TTRole'], req, res)) {
-      return false;
-    }
-
-    if (!utils.checkRequired(['username'], req, res)) {
-      return false;
-    }
-
-    if (!utils.checkRequired(['email'], req, res)) {
+    if (!utils.checkRequired(requiredFields, req, res)) {
       return false;
     }
 
@@ -62,7 +72,7 @@ module.exports = function () {
     if (req.body.email && req.body.email.length) {
       queries.mergeUid = async.apply(db.sortedSetScore, 'email:uid', req.body.email);
     }
-    queries.uid = async.apply(db.sortedSetScore, module.getSessionSharingName() + ':uid', req.body.TTUserId);
+    queries.uid = async.apply(db.sortedSetScore, module.getSessionSharingPropertyKey('uid'), req.body.externalUserId);
 
     var callback = function (err, uid, res) {
       return errorHandler.handle(err, res, { uid: uid });
@@ -84,20 +94,27 @@ module.exports = function () {
               if (err) {
                 return next(null, null);
               }
+
               if (exists) {
                 return next(null, uid);
               }
+
               /* reference is outdated, user got deleted */
-              db.sortedSetRemove(module.getSessionSharingName() + ':uid', req.body.TTUserId, function (err) {
+              db.sortedSetRemove(module.getSessionSharingPropertyKey('uid'), req.body.externalUserId, function (err) {
                 next(err, null);
               });
             });
           }
           if (checks.mergeUid && !isNaN(parseInt(checks.mergeUid, 10))) {
-            winston.info(`[tt-api-endpoint][create user] Found user via their email, associating this id (${req.body.TTUserId}) with their NodeBB account ${checks.mergeUid}`);
-            return db.sortedSetAdd(module.getSessionSharingName() + ':uid', checks.mergeUid, req.body.TTUserId, function (err) {
-              next(err, parseInt(checks.mergeUid, 10));
-            });
+            winston.info(`[tt-api-endpoint][create user] Found user via their email, associating this id (${req.body.externalUserId}) with their NodeBB account ${checks.mergeUid}`);
+            return db.sortedSetAdd(
+              module.getSessionSharingPropertyKey('uid'),
+              checks.mergeUid,
+              req.body.externalUserId,
+              function (err) {
+                next(err, parseInt(checks.mergeUid, 10));
+              }
+            );
           }
           setImmediate(next, null, null);
         },
@@ -108,18 +125,22 @@ module.exports = function () {
             return user.create(req.body, function (err, uid) {
               winston.info('[tt-api-endpoint][create user] user created');
 
-              if (parseInt(req.body.TTRole) === 20) {
-                groups.join('administrators', uid/* , next */);
-              } else if (parseInt(req.body.TTRole) === 14) {
-                groups.join('Pros', uid);
-              } else if (parseInt(req.body.TTRole) === 12) {
-                groups.join('Investors', uid);
+              var role = rolesMap[parseInt(req.body.externalUserRole, 10)];
+              if (!role) {
+                return next(new Error(`User role "${req.body.externalUserRole}" is invalid.`));
               }
 
-              winston.info(`[tt-api-endpoint][create user] add to db, associating id (${req.body.TTUserId}) with their NodeBB account ${uid}`);
-              db.sortedSetAdd(module.getSessionSharingName() + ':uid', uid, req.body.TTUserId, function (err, ourId = uid, ttId = req.body.TTUserId) {
-                winston.info('[tt-api-endpoint][create user] associated', { ourId, ttId });
-              });
+              groups.join(role, uid);
+
+              winston.info(`[tt-api-endpoint][create user] add to db, associating id (${req.body.externalUserId}) with their NodeBB account ${uid}`);
+              db.sortedSetAdd(
+                module.getSessionSharingPropertyKey('uid'),
+                uid,
+                req.body.externalUserId,
+                function (err, ourId = uid, ttId = req.body.externalUserId) {
+                  winston.info('[tt-api-endpoint][create user] associated', { ourId, ttId });
+                }
+              );
 
               next(err, uid, res, true);
             });
@@ -131,9 +152,9 @@ module.exports = function () {
   });
 
   app.delete('/', apiMiddleware.requireUser, function (req, res) {
-    winston.info('[tt-api-endpoint][delete user] start, ', { uid: req.body.TTUserId });
+    winston.info('[tt-api-endpoint][delete user] start, ', { uid: req.body.externalUserId });
 
-    if (!utils.checkRequired(['TTUserId'], req, res)) {
+    if (!utils.checkRequired(['externalUserId'], req, res)) {
       return false;
     }
 
@@ -144,11 +165,17 @@ module.exports = function () {
     // Clear out any user tokens belonging to the to-be-deleted user
     async.waterfall([
       function (next) {
-        module.getUser(req.body.TTUserId, function (err, userData) {
+        module.getUser(req.body.externalUserId, function (err, response) {
           if (err) {
             return next(null, null);
           }
-          next(null, parseInt(userData.uid));
+
+          var userId = 0;
+          if (typeof response !== 'undefined') {
+            userId = parseInt(response.uid, 10);
+          }
+
+          next(null, userId);
         });
       },
       function (uid, next) {
@@ -168,26 +195,33 @@ module.exports = function () {
   });
 
   app.put('/', apiMiddleware.requireUser, function (req, res) {
-    winston.info('[tt-api-endpoint][put user] start, ', { uid: req.body.TTUserId });
+    winston.info('[tt-api-endpoint][put user] start, ', { uid: req.body.externalUserId });
 
-    if (!utils.checkRequired(['TTUserId'], req, res)) {
+    if (!utils.checkRequired('externalUserId', req, res)) {
       return false;
     }
 
     var callback = function (err, res, uid) {
-      winston.info('[tt-api-endpoint][put user] callback', { err: err, uid: uid });
-      return errorHandler.handle(err, res, {
-        uid: uid
-      });
+      winston.info('[tt-api-endpoint][put user] callback', { err, uid });
+
+      return errorHandler.handle(err, res, { uid });
     };
 
     async.waterfall([
       function (next) {
-        module.getUser(req.body.TTUserId, function (err, userData) {
+        module.getUser(req.body.externalUserId, function (err, response) {
           if (err) {
             return next(null, null);
           }
-          next(null, parseInt(userData.uid));
+
+          winston.info('[tt-api-endpoint][get user from tt]: ', { response });
+
+          var userId = 0;
+          if (typeof(response) !== 'undefined') {
+            userId = parseInt(response.uid, 10);
+          }
+
+          next(null, userId);
         });
       },
       function (uid, next) {
@@ -195,36 +229,33 @@ module.exports = function () {
           var data = req.body;
           data.uid = uid;
 
-          winston.info('[tt-api-endpoint][put user] trying update ' + uid, { updateData: data });
+          winston.info(`[tt-api-endpoint][put user] trying update ${uid}`, { data });
 
           user.updateProfile(uid, data, function (err, user) {
             if (err) {
-              switch (err.message) {
-              case '[[error:email-taken]]':
+              if (err.message === '[[error:email-taken]]') {
                 winston.error('[tt-api-endpoint] Email already taken.');
                 res.code = 422;
                 res.message = 'Email already taken';
                 res.params = ['email'];
 
                 return errorHandler.respond(422, res);
-              default:
-                winston.error(`[tt-api-endpoint] Error encountered while parsing token: ${err.message}`);
-
-                return errorHandler.respond(422, res);
               }
+
+              winston.error(`[tt-api-endpoint] Error encountered while parsing token: ${err.message}`);
+
+              return errorHandler.respond(422, res);
             }
-            if (req.body.TTRole) {
-              groups.leave('administrators', uid);
-              groups.leave('Pros', uid);
-              groups.leave('Investors', uid);
 
-              if (parseInt(req.body.TTRole) === 20) {
-                groups.join('administrators', uid);
-              } else if (parseInt(req.body.TTRole) === 14) {
-                groups.join('Pros', uid);
-              } else if (parseInt(req.body.TTRole) === 12) {
-                groups.join('Investors', uid);
+            if (req.body.externalUserRole) {
+              Object.values(nodebbGroups).forEach(role => groups.leave(role, uid));
+
+              var role = rolesMap[parseInt(req.body.externalUserRole, 10)];
+              if (!role) {
+                return next(new Error(`User role "${req.body.externalUserRole}" is invalid.`));
               }
+
+              groups.join(role, uid);
             }
 
             return next(null, res, user.uid);
@@ -240,7 +271,7 @@ module.exports = function () {
 
   app.route('/ban')
     .post(apiMiddleware.requireUser, function (req, res) {
-      if (!utils.checkRequired(['TTUserId'], req, res)) {
+      if (!utils.checkRequired(['externalUserId'], req, res)) {
         return false;
       }
 
@@ -252,17 +283,18 @@ module.exports = function () {
 
       async.waterfall([
         function (next) {
-          module.getUser(req.body.TTUserId, function (err, userData) {
+          module.getUser(req.body.externalUserId, function (err, userData) {
             if (err) {
               return next(null, null);
             }
+
             next(null, parseInt(userData.uid));
           });
         },
         function (uid, next) {
           if (uid > 0) {
             user.ban(uid, function (err) {
-              winston.error('[tt-api-endpoint][ban] : ', { uid: uid, err: err });
+              winston.error('[tt-api-endpoint][ban] : ', { uid, err });
 
               return next(null, res, user.uid);
             });
@@ -271,7 +303,7 @@ module.exports = function () {
       ], callback);
     })
     .delete(apiMiddleware.requireUser, function (req, res) {
-      if (!utils.checkRequired(['TTUserId'], req, res)) {
+      if (!utils.checkRequired(['externalUserId'], req, res)) {
         return false;
       }
 
@@ -283,10 +315,11 @@ module.exports = function () {
 
       async.waterfall([
         function (next) {
-          module.getUser(req.body.TTUserId, function (err, userData) {
+          module.getUser(req.body.externalUserId, function (err, userData) {
             if (err) {
               return next(null, null);
             }
+
             next(null, parseInt(userData.uid));
           });
         },
