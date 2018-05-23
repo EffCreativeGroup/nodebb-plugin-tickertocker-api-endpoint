@@ -296,21 +296,31 @@ module.exports = function () {
 
       async.waterfall([
         function (next) {
-          module.getUser(req.body.externalUserId, function (err, userData) {
+          module.getUser(req.body.externalUserId, function (err, response) {
             if (err) {
               return next(null, null);
             }
 
-            next(null, parseInt(userData.uid));
+            var userId = 0;
+            if (typeof (response) !== 'undefined') {
+              userId = parseInt(response.uid, 10);
+            }
+
+            next(null, userId);
           });
         },
         function (uid, next) {
           if (uid > 0) {
+            winston.info('[tt-api-endpoint][try ban] : ');
             user.ban(uid, function (err) {
-              winston.error('[tt-api-endpoint][ban] : ', { uid, err });
+              winston.info('[tt-api-endpoint][ban] : ', { uid, err });
 
               return next(null, res, user.uid);
             });
+          } else {
+            winston.error('[tt-api-endpoint][nban user] user not exists');
+
+            return errorHandler.respond(404, res);
           }
         }
       ], callback);
@@ -328,21 +338,31 @@ module.exports = function () {
 
       async.waterfall([
         function (next) {
-          module.getUser(req.body.externalUserId, function (err, userData) {
+          module.getUser(req.body.externalUserId, function (err, response) {
             if (err) {
               return next(null, null);
             }
 
-            next(null, parseInt(userData.uid));
+            var userId = 0;
+            if (typeof (response) !== 'undefined') {
+              userId = parseInt(response.uid, 10);
+            }
+
+            next(null, userId);
           });
         },
         function (uid, next) {
           if (uid > 0) {
+            winston.info('[tt-api-endpoint][try unban] : ');
             user.unban(uid, function (err) {
-              winston.error('[tt-api-endpoint][unban] : ', { uid: uid, err: err });
+              winston.info('[tt-api-endpoint][unban] : ', { uid: uid, err: err });
 
               return next(null, res, user.uid);
             });
+          } else {
+            winston.error('[tt-api-endpoint][unban user] user not exists');
+
+            return errorHandler.respond(404, res);
           }
         }
       ], callback);
