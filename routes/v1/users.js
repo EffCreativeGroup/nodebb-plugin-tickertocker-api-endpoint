@@ -9,15 +9,15 @@ var errorHandler = require('../../lib/errorHandler');
 var utils = require('./utils');
 var async = require.main.require('async');
 var plugin = require('../../index');
-var { ROLE_ADMIN, ROLE_INVESTOR, ROLE_PRO } = require('../../constants/user-roles');
+var { ROLE_ADMIN, ROLE_INVESTOR, ROLE_LEADER } = require('../../constants/user-roles');
 var nodebbGroups = {
   administrators: 'administrators',
   investors: 'Investors',
-  pros: 'Pros'
+  leaders: 'Leaders'
 };
 var rolesMap = {
   [ROLE_ADMIN]: nodebbGroups.administrators,
-  [ROLE_PRO]: nodebbGroups.pros,
+  [ROLE_LEADER]: nodebbGroups.leaders,
   [ROLE_INVESTOR]: nodebbGroups.investors
 };
 const db = require.main.require('./src/database');
