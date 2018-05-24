@@ -70,15 +70,14 @@ module.exports = function () {
       return false;
     }
 
-    var queries = {};
+    const queries = {};
     if (req.body.email && req.body.email.length) {
       queries.mergeUid = async.apply(db.sortedSetScore, 'email:uid', req.body.email);
     }
+
     queries.uid = async.apply(db.sortedSetScore, module.getSessionSharingPropertyKey('uid'), req.body.externalUserId);
 
-    var callback = function (err, uid, res) {
-      return errorHandler.handle(err, res, { uid: uid });
-    };
+    const callback = (err, uid, res) => errorHandler.handle(err, res, { uid });
 
     async.parallel(queries, function (err, checks) {
       if (err) {
@@ -91,7 +90,7 @@ module.exports = function () {
           if (checks.uid && !isNaN(parseInt(checks.uid, 10))) {
             const uid = parseInt(checks.uid, 10);
             /* check if the user with the given id actually exists */
-            return user.exists(uid, function (err, exists) {
+            return user.exists(uid, (err, exists) => {
               /* ignore errors, but assume the user doesn't exist */
               if (err) {
                 return next(null, null);
@@ -102,7 +101,7 @@ module.exports = function () {
               }
 
               /* reference is outdated, user got deleted */
-              db.sortedSetRemove(module.getSessionSharingPropertyKey('uid'), req.body.externalUserId, function (err) {
+              db.sortedSetRemove(module.getSessionSharingPropertyKey('uid'), req.body.externalUserId, (err) => {
                 next(err, null);
               });
             });
@@ -113,7 +112,7 @@ module.exports = function () {
               module.getSessionSharingPropertyKey('uid'),
               checks.mergeUid,
               req.body.externalUserId,
-              function (err) {
+              (err) => {
                 next(err, parseInt(checks.mergeUid, 10));
               }
             );
@@ -123,23 +122,25 @@ module.exports = function () {
         /* create the user from payload if necessary */
         function (uid, next) {
           winston.info('[tt-api-endpoint][create user] need create user? :', !uid);
+
+          const group = rolesMap[parseInt(req.body.externalUserRole, 10)];
+          if (!group) {
+            return next(new Error(`User role "${req.body.externalUserRole}" is invalid.`), uid, res);
+          }
+
           if (!uid) {
             return user.create(req.body, function (err, uid) {
               winston.info('[tt-api-endpoint][create user] user created');
 
-              var role = rolesMap[parseInt(req.body.externalUserRole, 10)];
-              if (!role) {
-                return next(new Error(`User role "${req.body.externalUserRole}" is invalid.`));
-              }
-
-              groups.join(role, uid);
+              groups.join(group, uid);
 
               winston.info(`[tt-api-endpoint][create user] add to db, associating id (${req.body.externalUserId}) with their NodeBB account ${uid}`);
+
               db.sortedSetAdd(
                 module.getSessionSharingPropertyKey('uid'),
                 uid,
                 req.body.externalUserId,
-                function (err, ourId = uid, ttId = req.body.externalUserId) {
+                (err, ourId = uid, ttId = req.body.externalUserId) => {
                   winston.info('[tt-api-endpoint][create user] associated', { ourId, ttId });
                 }
               );
@@ -147,7 +148,35 @@ module.exports = function () {
               next(err, uid, res, true);
             });
           }
-          setImmediate(next, err, uid, res, false);
+
+          next(err, uid, res, false);
+        },
+        (uid, res, isNew, next) => {
+          winston.info(`[tt-api-endpoint][update user][${uid}]`, 'leave all groups');
+
+          groups.leaveAllGroups(uid, () => next(null, uid, res));
+        },
+        (uid, res, next) => {
+          const group = rolesMap[parseInt(req.body.externalUserRole, 10)];
+
+          winston.info(`[tt-api-endpoint][update user][${uid}]`, 'join group:', group);
+
+          groups.join(group, uid, () => next(null, uid, res));
+        },
+        (uid, res, next) => {
+          winston.info(`[tt-api-endpoint][update user][${uid}]`, 'update profile');
+
+          const data = req.body;
+          data.uid = uid;
+
+          user.updateProfile(uid, data, (err) => {
+            // Update avatar
+            if (typeof req.body.picture === 'string') {
+              db.setObjectField(`user:${uid}`, 'picture', data.picture);
+            }
+
+            next(err, uid, res);
+          });
         }
       ], callback);
     });
@@ -250,13 +279,7 @@ module.exports = function () {
             }
 
             if (req.body.externalUserRole) {
-              (function () {
-                for (var role in nodebbGroups) {
-                  if (nodebbGroups.hasOwnProperty(role)) {
-                    groups.leave(nodebbGroups[role], uid);
-                  }
-                }
-              }());
+              groups.leaveAllGroups(uid);
 
               var role = rolesMap[parseInt(req.body.externalUserRole, 10)];
               if (!role) {

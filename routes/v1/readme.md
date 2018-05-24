@@ -11,13 +11,13 @@
                 * `externalUserRole` - tickertocker ROLE_ID, 
                 * `username`, 
                 * `email` 
-            * **Accepts**: `fullname`, `website`, `password`
+            * **Accepts**: `fullname`, `website`, `password`, `aboutme`, `picture`
             * _(Bearer authorization token is required)_
         * `PUT /`
             * Update data of user
             * **Requires**: 
                 * `externalUserId` - tickertocker ID
-            * **Accepts**: `username`, `email`, `externalUserRole`, `fullname`, `website`
+            * **Accepts**: `username`, `email`, `externalUserRole`, `fullname`, `website`, `aboutme`, `picture`
             * _(Bearer authorization token is required)_
         * `DELETE /`
             * Delete user
