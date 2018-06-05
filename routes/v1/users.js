@@ -155,6 +155,7 @@ module.exports = function () {
           winston.info(`[tt-api-endpoint][update user][${uid}]`, 'leave all groups');
 
           groups.leaveAllGroups(uid, () => next(null, uid, res));
+          groups.join('registered-users');
         },
         (uid, res, next) => {
           const group = rolesMap[parseInt(req.body.externalUserRole, 10)];
@@ -280,6 +281,7 @@ module.exports = function () {
 
             if (req.body.externalUserRole) {
               groups.leaveAllGroups(uid);
+              groups.join('registered-users');
 
               var role = rolesMap[parseInt(req.body.externalUserRole, 10)];
               if (!role) {
