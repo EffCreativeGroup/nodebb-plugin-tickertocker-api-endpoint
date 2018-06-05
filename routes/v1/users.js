@@ -153,9 +153,10 @@ module.exports = function () {
         },
         (uid, res, isNew, next) => {
           winston.info(`[tt-api-endpoint][update user][${uid}]`, 'leave all groups');
-
           groups.leaveAllGroups(uid, () => next(null, uid, res));
-          groups.join('registered-users');
+        },
+        (uid, res, next) => {
+          groups.join('registered-users', uid, () => next(null, uid, res));
         },
         (uid, res, next) => {
           const group = rolesMap[parseInt(req.body.externalUserRole, 10)];
@@ -263,7 +264,7 @@ module.exports = function () {
 
           winston.info(`[tt-api-endpoint][put user] trying update ${uid}`, { data });
 
-          user.updateProfile(uid, data, function (err, user) {
+          user.updateProfile(uid, data, async function (err, user) {
             if (err) {
               if (err.message === '[[error:email-taken]]') {
                 winston.error('[tt-api-endpoint] Email already taken.');
@@ -280,15 +281,14 @@ module.exports = function () {
             }
 
             if (req.body.externalUserRole) {
-              groups.leaveAllGroups(uid);
-              groups.join('registered-users');
-
+              await groups.leaveAllGroups(uid);
+              await groups.join('registered-users', uid);
               var role = rolesMap[parseInt(req.body.externalUserRole, 10)];
               if (!role) {
                 return next(new Error(`User role "${req.body.externalUserRole}" is invalid.`));
               }
 
-              groups.join(role, uid);
+              await groups.join(role, uid);
             }
 
             // Update avatar
